@@ -9,6 +9,7 @@ import org.knowm.xchange.ExchangeFactory;
 import org.knowm.xchange.currency.Currency;
 import org.knowm.xchange.currency.CurrencyPair;
 import org.knowm.xchange.dto.account.AccountInfo;
+import org.knowm.xchange.dto.account.Balance;
 import org.knowm.xchange.dto.account.Wallet;
 import org.knowm.xchange.dto.marketdata.Ticker;
 import org.knowm.xchange.exceptions.ExchangeException;
@@ -68,8 +69,16 @@ public class App {
 				Iterator it = wallets.entrySet().iterator();
 			    while (it.hasNext()) {
 			        Map.Entry pair = (Map.Entry)it.next();
-			        System.out.println("Wallet: " + pair.getKey() + " => " + pair.getValue());
-			        it.remove(); // avoids a ConcurrentModificationException
+			        //System.out.println("Wallet: " + pair.getKey() + " => " + pair.getValue());
+			        Wallet wallet = (Wallet) pair.getValue();
+			        
+			        Map<Currency, Balance> balances = wallet.getBalances();
+			        System.out.println("Balances: " + balances + "\n-\n");
+			        Iterator it2 = balances.entrySet().iterator();
+				    while (it2.hasNext()) {
+				        Map.Entry pair2 = (Map.Entry)it2.next();
+				        System.out.println(pair2.getKey() + ": " + ((Balance)pair2.getValue()).getTotal().toPlainString());
+				    }
 			    }
 				
 				
