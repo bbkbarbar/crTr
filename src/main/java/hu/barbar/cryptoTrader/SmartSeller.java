@@ -3,24 +3,19 @@ package hu.barbar.cryptoTrader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Date;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
 
 import org.knowm.xchange.Exchange;
 import org.knowm.xchange.ExchangeFactory;
 import org.knowm.xchange.currency.Currency;
 import org.knowm.xchange.currency.CurrencyPair;
+import org.knowm.xchange.dto.Order.OrderType;
 import org.knowm.xchange.dto.account.FundingRecord;
 import org.knowm.xchange.dto.marketdata.Ticker;
-import org.knowm.xchange.dto.trade.OpenOrders;
+import org.knowm.xchange.dto.trade.MarketOrder;
 import org.knowm.xchange.exceptions.ExchangeException;
 import org.knowm.xchange.exceptions.NotAvailableFromExchangeException;
 import org.knowm.xchange.exceptions.NotYetImplementedForExchangeException;
 import org.knowm.xchange.kraken.KrakenExchange;
-import org.knowm.xchange.kraken.dto.trade.KrakenOpenPosition;
-import org.knowm.xchange.kraken.dto.trade.KrakenOrderFlags;
-import org.knowm.xchange.kraken.service.KrakenTradeServiceRaw;
 import org.knowm.xchange.service.account.AccountService;
 import org.knowm.xchange.service.marketdata.MarketDataService;
 import org.knowm.xchange.service.trade.TradeService;
@@ -47,6 +42,8 @@ public class SmartSeller {
 	
 	private String currency = null;
 	
+	private CurrencyPair usedCurrencyPair = null;
+	
 	private BigDecimal stopPrice = null;
 	
 	private BigDecimal initialPrice = null;
@@ -63,17 +60,26 @@ public class SmartSeller {
 		processParams(args);
 		
 		initExchange();
+
+		usedCurrencyPair = getUSDBasedCurrencyPairFor(currency);
 		
-		//TODO: get initialPrice from Kraken.
-		
-		initialPrice = getPriceOf(getUSDBasedCurrencyPairFor(currency));
+		// Get initialPrice from Kraken.
+		long before, after;
+		before = System.currentTimeMillis();
+		initialPrice = getPriceOf(usedCurrencyPair);
+		after = System.currentTimeMillis();
+		System.out.println("Elasped time for get current price: " + (after - before) + " ms");
 		if(initialPrice == null){
 			System.exit(2);
 		}
 		
+		// Show parameters
 		System.out.println("Initial price:      \t" + initialPrice + " USD / " + this.currency);
 		System.out.println("Initial stop limit: \t" + stopPrice + " USD / " + this.currency);
+		System.out.println("Amount:             \t" + this.amount + " " + this.currency);
+		System.out.println("Minimum income:     \t" + (this.amount.multiply(this.stopPrice)) + " USD");
 		
+		// Check parameters and exit if invalid
 		if(stopPrice.compareTo(initialPrice) >= 0){
 			//TODO log
 			System.out.println("ERROR! Inital stop price is NOT lower then initial price!");
@@ -87,7 +93,16 @@ public class SmartSeller {
 		krakenExchange = ExchangeFactory.INSTANCE.createExchange(KrakenExchange.class.getName());
 		// Interested in the public market data feed (no authentication)
 		marketDataService = krakenExchange.getMarketDataService();
+		
+		JsonConfigHandler config = new JsonConfigHandler(configSourceJSONPath);
+
+		// krakenExchange = getExchangeForUser()
+		krakenExchange.getExchangeSpecification().setApiKey(config.getString("api-key.appKey"));
+		krakenExchange.getExchangeSpecification().setSecretKey(config.getString("api-key.privateKey"));
+		krakenExchange.getExchangeSpecification().setUserName(config.getString("api-key.username"));
+		krakenExchange.applySpecification(krakenExchange.getExchangeSpecification());
 	}
+	
 	
 	private void processParams(String[] args){
 		System.out.println("Args size: " + args.length);
@@ -106,6 +121,7 @@ public class SmartSeller {
 		
 		System.out.println("Amount: " + amount + " " + currency);
 	}
+	
 	
 	/**
 	 * Return the last price of specified currency pair OR <br>
@@ -144,6 +160,7 @@ public class SmartSeller {
 		return lastPrice;
 	}
 
+	
 	private static CurrencyPair getUSDBasedCurrencyPairFor(String shortCoinName){
 		if(shortCoinName == null || shortCoinName.trim().equals("")){
 			//TODO log
@@ -176,8 +193,47 @@ public class SmartSeller {
 		return null;
 	}
 	
+	/**
+	 * Create Selling order with specified parameters
+	 * @param tradeableAmount
+	 * @param currencyPair
+	 * @return the OrderID of created order if it could be created OR <br>
+	 * <b>null</b> if there were any problem..
+	 */
+	private String createSellOrderFor(BigDecimal tradeableAmount, CurrencyPair currencyPair){
+
+		// Interested in the private trading functionality (authentication) 
+		TradeService tradeService = krakenExchange.getTradeService();
+		
+		// Create a marketOrder with specified parameters 
+		MarketOrder marketOrder = new MarketOrder(OrderType.ASK, tradeableAmount, currencyPair);
+		
+		String orderID = null;
+		try {
+			
+			orderID = tradeService.placeMarketOrder(marketOrder);
+			System.out.println("Order created with ID: " + orderID);
+			
+		} catch (NotAvailableFromExchangeException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NotYetImplementedForExchangeException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ExchangeException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return orderID;
+	}
 	
-	// 0.01 ETH
+	
+	// amount shortCoinName initialStopPrice
+	// 0.01   ETH           330.17
 	public static void main(String[] args) {
 		
 		me = new SmartSeller(args);
@@ -205,14 +261,6 @@ public class SmartSeller {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
-		JsonConfigHandler config = new JsonConfigHandler(configSourceJSONPath);
-
-		// krakenExchange = getExchangeForUser()
-		krakenExchange.getExchangeSpecification().setApiKey(config.getString("api-key.appKey"));
-		krakenExchange.getExchangeSpecification().setSecretKey(config.getString("api-key.privateKey"));
-		krakenExchange.getExchangeSpecification().setUserName(config.getString("api-key.username"));
-		krakenExchange.applySpecification(krakenExchange.getExchangeSpecification());
 
 		// Interested in the private trading functionality (authentication)
 		TradeService tradeService = krakenExchange.getTradeService();
