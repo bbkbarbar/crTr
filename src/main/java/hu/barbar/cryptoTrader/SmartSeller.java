@@ -47,28 +47,135 @@ public class SmartSeller {
 	
 	private String currency = null;
 	
-	private BigDecimal initialStopPrice = null;
+	private BigDecimal stopPrice = null;
 	
+	private BigDecimal initialPrice = null;
+	
+	//TODO: remove static modifier later..
+	private static Exchange krakenExchange = null;
+
+	//TODO: remove static modifier later..
+	private static MarketDataService marketDataService = null;
 	
 	
 	public SmartSeller(String[] args){
 		
+		processParams(args);
+		
+		initExchange();
+		
+		//TODO: get initialPrice from Kraken.
+		
+		initialPrice = getPriceOf(getUSDBasedCurrencyPairFor(currency));
+		if(initialPrice == null){
+			System.exit(2);
+		}
+		
+		System.out.println("Initial price:      \t" + initialPrice + " USD / " + this.currency);
+		System.out.println("Initial stop limit: \t" + stopPrice + " USD / " + this.currency);
+		
+		if(stopPrice.compareTo(initialPrice) >= 0){
+			//TODO log
+			System.out.println("ERROR! Inital stop price is NOT lower then initial price!");
+			//TODO: create an "instant sell" option for this case..
+			System.exit(3);
+		}
+		
+	}
+	
+	private void initExchange(){
+		krakenExchange = ExchangeFactory.INSTANCE.createExchange(KrakenExchange.class.getName());
+		// Interested in the public market data feed (no authentication)
+		marketDataService = krakenExchange.getMarketDataService();
+	}
+	
+	private void processParams(String[] args){
 		System.out.println("Args size: " + args.length);
 		if(args.length < EXPECTED_ARGUMENT_COUNT){
 			System.out.println("Too few arguments.\nExample useage:"
 					+ "SmartSeller.jar "
 					+ "0.1 ETH 340.17"
 					+ "");
-			return;
+			System.exit(1);
 		}
 		
 		amount = new BigDecimal(args[0].replaceAll(",", ""));
 		currency = args[1];
-		initialStopPrice = new BigDecimal(args[2].replaceAll(",", ""));
+		stopPrice = new BigDecimal(args[2].replaceAll(",", ""));
 		
 		
 		System.out.println("Amount: " + amount + " " + currency);
 	}
+	
+	/**
+	 * Return the last price of specified currency pair OR <br>
+	 * <b>null</b> in case of exception caught.
+	 * @param currencyPair
+	 * @return
+	 */
+	private BigDecimal getPriceOf(CurrencyPair currencyPair){
+		
+		if(currencyPair == null){
+			//TODO log..
+			System.out.println("Can not get price of currencyPair without specified currencyPair (it was NULL).");
+			return null;
+		}
+		
+		BigDecimal lastPrice = null;
+		
+		// Get the latest ticker data showing price of specified currency pair.
+		Ticker ticker;
+		try {
+			
+			ticker = marketDataService.getTicker(currencyPair);
+			lastPrice = ticker.getLast();
+
+		} catch (NotAvailableFromExchangeException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ExchangeException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return lastPrice;
+	}
+
+	private static CurrencyPair getUSDBasedCurrencyPairFor(String shortCoinName){
+		if(shortCoinName == null || shortCoinName.trim().equals("")){
+			//TODO log
+			System.out.println("Can not create USD based CurrencyPair object for: |" + shortCoinName + "|.");
+			return null;
+		}
+		
+		if(shortCoinName.equalsIgnoreCase("BTC")){
+			return CurrencyPair.BTC_USD;
+		}
+		
+		if(shortCoinName.equalsIgnoreCase("ETH")){
+			return CurrencyPair.ETH_USD;
+		}
+		
+		if(shortCoinName.equalsIgnoreCase("BCH")){
+			return CurrencyPair.BCH_USD;
+		}
+		
+		if(shortCoinName.equalsIgnoreCase("XMR")){
+			return CurrencyPair.XMR_USD;
+		}
+		
+		if(shortCoinName.equalsIgnoreCase("XRP")){
+			return CurrencyPair.XRP_USD;
+		}
+		
+		//TODO log
+		System.out.println("ERROR: Can not get CurrencyPair object for |" + shortCoinName + "|.");
+		return null;
+	}
+	
 	
 	// 0.01 ETH
 	public static void main(String[] args) {
@@ -76,11 +183,6 @@ public class SmartSeller {
 		me = new SmartSeller(args);
 		
 		/*
-		
-		Exchange krakenExchange = ExchangeFactory.INSTANCE.createExchange(KrakenExchange.class.getName());
-
-		// Interested in the public market data feed (no authentication)
-		MarketDataService marketDataService = krakenExchange.getMarketDataService();
 
 		// Get the latest ticker data showing BTC to USD
 		Ticker ticker;
