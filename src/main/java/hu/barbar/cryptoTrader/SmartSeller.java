@@ -3,13 +3,18 @@ package hu.barbar.cryptoTrader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.Iterator;
+import java.util.Map;
 
 import org.knowm.xchange.Exchange;
 import org.knowm.xchange.ExchangeFactory;
 import org.knowm.xchange.currency.Currency;
 import org.knowm.xchange.currency.CurrencyPair;
 import org.knowm.xchange.dto.Order.OrderType;
+import org.knowm.xchange.dto.account.AccountInfo;
+import org.knowm.xchange.dto.account.Balance;
 import org.knowm.xchange.dto.account.FundingRecord;
+import org.knowm.xchange.dto.account.Wallet;
 import org.knowm.xchange.dto.marketdata.Ticker;
 import org.knowm.xchange.dto.trade.MarketOrder;
 import org.knowm.xchange.exceptions.ExchangeException;
@@ -68,16 +73,21 @@ public class SmartSeller {
 		before = System.currentTimeMillis();
 		initialPrice = getPriceOf(usedCurrencyPair);
 		after = System.currentTimeMillis();
-		System.out.println("Elasped time for get current price: " + (after - before) + " ms");
+		System.out.println("Elasped time for get current price: " + (after - before) + " ms\n");
 		if(initialPrice == null){
 			System.exit(2);
 		}
 		
+		BigDecimal currentlyAvailableBalance = this.getAvailableBalanceFor(this.currency);
+		
 		// Show parameters
 		System.out.println("Initial price:      \t" + initialPrice + " USD / " + this.currency);
 		System.out.println("Initial stop limit: \t" + stopPrice + " USD / " + this.currency);
-		System.out.println("Amount:             \t" + this.amount + " " + this.currency);
-		System.out.println("Minimum income:     \t" + (this.amount.multiply(this.stopPrice)) + " USD");
+		System.out.println("Amount:             \t" + (lessThen(this.amount,0)?"All available":this.amount) + " " + this.currency);
+		System.out.println("Available balance:  \t" + currentlyAvailableBalance + " " + this.currency);
+		System.out.println("Minimum income:     \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.stopPrice)) + " USD");
+		System.out.println("Current value:      \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.initialPrice)) + " USD");
+		System.out.println("Maximum loss:       \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.initialPrice).subtract((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.stopPrice)) ) + " USD");
 		
 		// Check parameters and exit if invalid
 		if(stopPrice.compareTo(initialPrice) >= 0){
@@ -87,7 +97,61 @@ public class SmartSeller {
 			System.exit(3);
 		}
 		
+		
 	}
+	
+	private boolean lessThen(BigDecimal value, int compareValue){
+		return value.compareTo(new BigDecimal(compareValue)) < 0;
+	}
+	
+	
+	private BigDecimal getAvailableBalanceFor(String currencyShortName){
+		if(currencyShortName == null || currencyShortName.trim().equals("")){
+			//TODO: handle this case
+			return null;
+		}
+		Balance balance = getBalanceFor(currencyShortName); 
+		if(balance == null){
+			//TODO: handle this case
+			return null;
+		}
+		return balance.getAvailable();
+	}
+	
+	private Balance getBalanceFor(String currencyShortName){
+		if(currencyShortName == null || currencyShortName.trim().equals("")){
+			//TODO: handle this case
+			return null;
+		}
+		AccountInfo accountInfo;
+		try {
+			accountInfo = krakenExchange.getAccountService().getAccountInfo();
+		} catch (IOException e) {
+			//TODO
+			e.printStackTrace();
+			return null;
+		}
+		Map<String, Wallet> wallets = accountInfo.getWallets();
+
+		Iterator it = wallets.entrySet().iterator();
+		while (it.hasNext()) {
+			Map.Entry pair = (Map.Entry) it.next();
+			// System.out.println("Wallet: " + pair.getKey() + " => " + pair.getValue());
+			Wallet wallet = (Wallet) pair.getValue();
+
+			Map<Currency, Balance> balances = wallet.getBalances();
+			Iterator it2 = balances.entrySet().iterator();
+			while (it2.hasNext()) {
+				Map.Entry pair2 = (Map.Entry) it2.next();
+				if(pair2.getKey().toString().trim().equalsIgnoreCase(currencyShortName.trim())){
+					return (Balance) pair2.getValue();
+				}
+			}
+		}
+		
+		return null;
+	}
+
 	
 	private void initExchange(){
 		krakenExchange = ExchangeFactory.INSTANCE.createExchange(KrakenExchange.class.getName());
