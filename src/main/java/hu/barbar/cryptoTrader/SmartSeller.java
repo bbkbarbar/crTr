@@ -54,7 +54,7 @@ public class SmartSeller {
 
 	private static final int EXPECTED_ARGUMENT_COUNT = 3;
 
-	JsonConfigHandler config = null;
+	private JsonConfigHandler config = null;
 	
 	private static String logFile = null;
 	
@@ -142,7 +142,7 @@ public class SmartSeller {
 		logFile = config.getString("logfile", null);
 		
 		String dataFileName = config.getString("datafile.name of data file", null);
-		if(dataFileName.trim().equals("")){
+		if(dataFileName != null && dataFileName.trim().equals("")){
 			dataFileName = null;
 		}
 		SimpleDateFormat sdfForDataFileName = new SimpleDateFormat(config.getString("datafile.timestamp format in filename", DEFAULT_TIMESTAMP_FORMAT_IN_FILENAME));
@@ -172,7 +172,7 @@ public class SmartSeller {
 			currentPrice = getPriceOf(usedCurrencyPair);
 			
 			// Price increasing >> need to increase stopPrice
-			if(currentPrice.compareTo(lastPrice) > 0){
+			if(currentPrice.compareTo( (stopPrice.add(sellMargin)) ) > 0){
 				stopPrice = currentPrice.subtract(sellMargin);
 			}
 			// Store the previous price
