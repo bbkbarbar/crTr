@@ -7,7 +7,7 @@
    "delay_in_ms":5000,
    "dateformat":"yyyy-MM-dd HH:mm:ss",
    "datafile":{
-         "Note":"Saving data file can be disabled if name of data file param missing from here...",
+         "Note":"Saving data file can be disabled if name of data file param missing from here or set empty string for as value...",
    		"name of data file":"smartSeller_data_",
    		"timestamp format in filename":"yyyyMMdd_HHmmss",
    		"extension":"csv",

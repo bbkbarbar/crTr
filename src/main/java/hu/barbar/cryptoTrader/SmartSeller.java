@@ -136,10 +136,13 @@ public class SmartSeller {
 		logFile = config.getString("logfile", null);
 		
 		String dataFileName = config.getString("datafile.name of data file", null);
+		if(dataFileName.trim().equals("")){
+			dataFileName = null;
+		}
 		SimpleDateFormat sdfForDataFileName = new SimpleDateFormat(config.getString("datafile.timestamp format in filename", "yyyy-MM-dd_HH-mm-ss"));
 		String dataFileExt = config.getString("datafile.extension", DEFAULT_DATA_FILE_EXTENSION);
 		
-		if(dataFileName != null){
+		if(dataFileName != null){ // it means data logging is "disabled"
 			this.dataFile = dataFileName + sdfForDataFileName.format(new Date()) + "." + dataFileExt;
 			this.separatorInDataFile = config.getString("datafile.separator", ";");
 			//Write the header line into datafile.. 
