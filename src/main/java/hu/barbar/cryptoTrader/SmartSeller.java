@@ -43,14 +43,20 @@ public class SmartSeller {
 	final static Logger logger = LoggerFactory.getLogger(SmartSeller.class);
 	
 	private long DEFAULT_DELAY_IN_MS = 30000;
+	
+	private static final String DEFAULT_DATA_FILE_EXTENSION = "csv";
 
 	private static final int EXPECTED_ARGUMENT_COUNT = 3;
 	
 	JsonConfigHandler config = null;
 	
-	private static SimpleDateFormat sdf = null;
-	
 	private static String logFile = null;
+	
+	private String dataFile = null;
+	
+	private String separatorInDataFile = null;
+	
+	private static SimpleDateFormat sdf = null;
 	
 	private static SmartSeller me;
 	
@@ -79,14 +85,10 @@ public class SmartSeller {
 	
 	public SmartSeller(String[] args){
 		
-		config = new JsonConfigHandler(configSourceJSONPath);
-		
-		logFile = config.getString("logfile", null);
-		
+		readConfig();
 		processParams(args);
-		
 		sdf = new SimpleDateFormat(config.getString("dateformat", "yyyy-MM-dd HH:mm:ss"));
-		
+
 		initExchange();
 
 		usedCurrencyPair = getUSDBasedCurrencyPairFor(currency);
@@ -128,6 +130,26 @@ public class SmartSeller {
 		
 	}
 	
+	private void readConfig(){
+		config = new JsonConfigHandler(configSourceJSONPath);
+		
+		logFile = config.getString("logfile", null);
+		
+		String dataFileName = config.getString("datafile.name of data file", null);
+		SimpleDateFormat sdfForDataFileName = new SimpleDateFormat(config.getString("datafile.timestamp format in filename", "yyyy-MM-dd_HH-mm-ss"));
+		String dataFileExt = config.getString("datafile.extension", DEFAULT_DATA_FILE_EXTENSION);
+		
+		if(dataFileName != null){
+			this.dataFile = dataFileName + sdfForDataFileName.format(new Date()) + "." + dataFileExt;
+			this.separatorInDataFile = config.getString("datafile.separator", ";");
+			//Write the header line into datafile.. 
+			FileHandler.appendToFile(this.dataFile, "Date" + separatorInDataFile + "Price" + separatorInDataFile + "StopLimit" + separatorInDataFile + "Margin" + separatorInDataFile + "Diff");
+		}else{
+			this.dataFile = null;
+		}
+		
+	}
+	
 	private void doTheJob(){
 		
 		// Store the previous price
@@ -146,6 +168,7 @@ public class SmartSeller {
 			lastPrice = currentPrice.add(BigDecimal.ZERO);
 			
 			showCurrentValues();
+			storeValues();
 			
 			// Check if stopPrice is bigger then currentPrice >> need to sell..
 			if(stopPrice.compareTo(currentPrice) > 0){
@@ -190,6 +213,18 @@ public class SmartSeller {
 		line += "\tDiff: "   + diff.setScale(3, BigDecimal.ROUND_HALF_UP);
 		
 		log(line);
+	}
+	
+	private void storeValues(){
+		if(this.dataFile != null){
+			BigDecimal diff = currentPrice.subtract(stopPrice);
+			String line = sdf.format(new Date());
+			line += separatorInDataFile + currentPrice;
+			line += separatorInDataFile + stopPrice;
+			line += separatorInDataFile + sellMargin;
+			line += separatorInDataFile + diff;
+			FileHandler.appendToFile(this.dataFile, line);
+		}
 	}
 	
 	private boolean lessThen(BigDecimal value, int compareValue){
