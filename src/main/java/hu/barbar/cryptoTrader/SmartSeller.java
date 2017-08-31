@@ -45,9 +45,15 @@ public class SmartSeller {
 	private long DEFAULT_DELAY_IN_MS = 30000;
 	
 	private static final String DEFAULT_DATA_FILE_EXTENSION = "csv";
+	
+	private static final String DEFAULT_SEPARATOR_IN_DATA_FILE = ";";
+	
+	private static final String DEFAULT_TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss";
+	
+	private static final String DEFAULT_TIMESTAMP_FORMAT_IN_FILENAME = "yyyy-MM-dd_HH-mm-ss";
 
 	private static final int EXPECTED_ARGUMENT_COUNT = 3;
-	
+
 	JsonConfigHandler config = null;
 	
 	private static String logFile = null;
@@ -87,7 +93,7 @@ public class SmartSeller {
 		
 		readConfig();
 		processParams(args);
-		sdf = new SimpleDateFormat(config.getString("dateformat", "yyyy-MM-dd HH:mm:ss"));
+		sdf = new SimpleDateFormat(config.getString("dateformat", DEFAULT_TIMESTAMP_FORMAT));
 
 		initExchange();
 
@@ -139,15 +145,17 @@ public class SmartSeller {
 		if(dataFileName.trim().equals("")){
 			dataFileName = null;
 		}
-		SimpleDateFormat sdfForDataFileName = new SimpleDateFormat(config.getString("datafile.timestamp format in filename", "yyyy-MM-dd_HH-mm-ss"));
+		SimpleDateFormat sdfForDataFileName = new SimpleDateFormat(config.getString("datafile.timestamp format in filename", DEFAULT_TIMESTAMP_FORMAT_IN_FILENAME));
 		String dataFileExt = config.getString("datafile.extension", DEFAULT_DATA_FILE_EXTENSION);
 		
-		if(dataFileName != null){ // it means data logging is "disabled"
+		if(dataFileName != null){
+			// Data logging is enabled
 			this.dataFile = dataFileName + sdfForDataFileName.format(new Date()) + "." + dataFileExt;
-			this.separatorInDataFile = config.getString("datafile.separator", ";");
+			this.separatorInDataFile = config.getString("datafile.separator", DEFAULT_SEPARATOR_IN_DATA_FILE);
 			//Write the header line into datafile.. 
 			FileHandler.appendToFile(this.dataFile, "Date" + separatorInDataFile + "Price" + separatorInDataFile + "StopLimit" + separatorInDataFile + "Margin" + separatorInDataFile + "Diff");
 		}else{
+			// It means data logging is "disabled"
 			this.dataFile = null;
 		}
 		
