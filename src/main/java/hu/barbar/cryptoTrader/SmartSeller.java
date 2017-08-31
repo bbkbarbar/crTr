@@ -184,6 +184,8 @@ public class SmartSeller {
 			// Check if stopPrice is bigger then currentPrice >> need to sell..
 			if(stopPrice.compareTo(currentPrice) > 0){
 				log("\nPrice is lower then stop price!\nNeed to sell!!!");
+				String sellOrderId = createSellOrderFor(this.amount, this.usedCurrencyPair);
+				log("Sell order submitted: " + sellOrderId);
 				System.exit(0);
 			}
 			
@@ -366,6 +368,10 @@ public class SmartSeller {
 			//TODO log
 			log("Can not create USD based CurrencyPair object for: |" + shortCoinName + "|.");
 			return null;
+		}
+		
+		if(shortCoinName.equalsIgnoreCase("XBT")){
+			return CurrencyPair.BTC_USD;
 		}
 		
 		if(shortCoinName.equalsIgnoreCase("BTC")){

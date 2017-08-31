@@ -1,0 +1,1 @@
+mvn deploy:deploy-file
