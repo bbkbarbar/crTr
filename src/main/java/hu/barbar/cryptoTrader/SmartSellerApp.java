@@ -90,6 +90,9 @@ public class SmartSellerApp {
 	private static MarketDataService marketDataService = null;
 	
 	
+	private SmartSeller mySeller = null;
+	
+	
 	public SmartSellerApp(String[] args){
 		
 		readConfig();
@@ -98,6 +101,28 @@ public class SmartSellerApp {
 
 		initExchange();
 
+		mySeller = new SmartSeller(this.amount, this.currency, this.stopPrice, SmartSellerApp.marketDataService) {
+			
+			private static final long serialVersionUID = 3911932357314851974L;
+			
+			@Override
+			public void log(long smartSellerId, String line) {
+				SmartSellerApp.log(line);
+			}
+
+			@Override
+			public void storeValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff) {
+				SmartSellerApp.this.storeValues(date, currentPrice, stopPrice2, diff);
+			}
+
+			@Override
+			public void onSellOrderSubmitted(String sellOrderId) {
+				System.exit(0);
+			}
+			
+		};
+		
+		/*
 		usedCurrencyPair = ExchangeFuntions.getUSDBasedCurrencyPairFor(currency);
 		
 		// Get initialPrice from Kraken.
@@ -114,6 +139,7 @@ public class SmartSellerApp {
 		
 		sellMargin = currentPrice.subtract(stopPrice);
 		
+		
 		// Show parameters
 		log("Initial price:      \t" + currentPrice + " USD / " + this.currency);
 		log("Initial stop limit: \t" + stopPrice + " USD / " + this.currency);
@@ -125,6 +151,7 @@ public class SmartSellerApp {
 		log("Maximum loss:       \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.currentPrice).subtract((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.stopPrice)) ).setScale(2, BigDecimal.ROUND_HALF_UP) + " USD");
 		log("\n");
 		
+		
 		// Check parameters and exit if invalid
 		if(stopPrice.compareTo(currentPrice) >= 0){
 			//TODO log
@@ -132,6 +159,8 @@ public class SmartSellerApp {
 			//TODO: create an "instant sell" option for this case..
 			System.exit(3);
 		}
+		
+		/**/
 		
 	}
 	
@@ -167,6 +196,7 @@ public class SmartSellerApp {
 		
 		while(true){
 			
+			/*
 			// Update current price
 			currentPrice = ExchangeFuntions.getPriceOf(marketDataService, usedCurrencyPair);
 			
@@ -187,6 +217,8 @@ public class SmartSellerApp {
 				log("Sell order submitted: " + sellOrderId);
 				System.exit(0);
 			}
+			
+			/**/
 			
 			try {
 				Thread.sleep(config.getLong("delay_in_ms", DEFAULT_DELAY_IN_MS));
@@ -227,72 +259,18 @@ public class SmartSellerApp {
 		log(line);
 	}
 	
-	private void storeValues(){
+	private void storeValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff){
 		if(this.dataFile != null){
-			BigDecimal diff = currentPrice.subtract(stopPrice);
-			String line = sdf.format(new Date());
+			String line = sdf.format(date);
 			line += separatorInDataFile + currentPrice;
-			line += separatorInDataFile + stopPrice;
+			line += separatorInDataFile + stopPrice2;
 			//line += separatorInDataFile + sellMargin;
 			line += separatorInDataFile + diff;
 			FileHandler.appendToFile(this.dataFile, line);
 		}
 	}
 	
-	private boolean lessThen(BigDecimal value, int compareValue){
-		return value.compareTo(new BigDecimal(compareValue)) < 0;
-	}
-	
-	
-	private BigDecimal getAvailableBalanceFor(String currencyShortName){
-		if(currencyShortName == null || currencyShortName.trim().equals("")){
-			//TODO: handle this case
-			return null;
-		}
-		Balance balance = getBalanceFor(currencyShortName); 
-		if(balance == null){
-			//TODO: handle this case
-			return null;
-		}
-		return balance.getAvailable();
-	}
-	
-	private Balance getBalanceFor(String currencyShortName){
-		if(currencyShortName == null || currencyShortName.trim().equals("")){
-			//TODO: handle this case
-			return null;
-		}
-		AccountInfo accountInfo;
-		try {
-			accountInfo = krakenExchange.getAccountService().getAccountInfo();
-		} catch (IOException e) {
-			//TODO
-			e.printStackTrace();
-			return null;
-		}
-		Map<String, Wallet> wallets = accountInfo.getWallets();
-
-		Iterator it = wallets.entrySet().iterator();
-		while (it.hasNext()) {
-			Map.Entry pair = (Map.Entry) it.next();
-			// log("Wallet: " + pair.getKey() + " => " + pair.getValue());
-			Wallet wallet = (Wallet) pair.getValue();
-
-			Map<Currency, Balance> balances = wallet.getBalances();
-			Iterator it2 = balances.entrySet().iterator();
-			while (it2.hasNext()) {
-				Map.Entry pair2 = (Map.Entry) it2.next();
-				if(pair2.getKey().toString().trim().equalsIgnoreCase(currencyShortName.trim())){
-					return (Balance) pair2.getValue();
-				}
-			}
-		}
-		
-		return null;
-	}
-
-	
-	private void initExchange(){
+	private boolean initExchange(){
 		krakenExchange = ExchangeFactory.INSTANCE.createExchange(KrakenExchange.class.getName());
 		// Interested in the public market data feed (no authentication)
 		marketDataService = krakenExchange.getMarketDataService();
@@ -302,6 +280,10 @@ public class SmartSellerApp {
 		krakenExchange.getExchangeSpecification().setSecretKey(config.getString("api-key.privateKey"));
 		krakenExchange.getExchangeSpecification().setUserName(config.getString("api-key.username"));
 		krakenExchange.applySpecification(krakenExchange.getExchangeSpecification());
+		
+		ExchangeFuntions.setExchange(krakenExchange);
+		
+		return (krakenExchange != null && marketDataService != null);
 	}
 	
 	

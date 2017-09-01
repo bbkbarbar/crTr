@@ -2,11 +2,17 @@ package hu.barbar.cryptoTrader;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Iterator;
+import java.util.Map;
 
 import org.knowm.xchange.Exchange;
 import org.knowm.xchange.ExchangeFactory;
+import org.knowm.xchange.currency.Currency;
 import org.knowm.xchange.currency.CurrencyPair;
 import org.knowm.xchange.dto.Order.OrderType;
+import org.knowm.xchange.dto.account.AccountInfo;
+import org.knowm.xchange.dto.account.Balance;
+import org.knowm.xchange.dto.account.Wallet;
 import org.knowm.xchange.dto.marketdata.Ticker;
 import org.knowm.xchange.dto.trade.MarketOrder;
 import org.knowm.xchange.exceptions.ExchangeException;
@@ -18,6 +24,12 @@ import org.knowm.xchange.service.trade.TradeService;
 
 public class ExchangeFuntions {
 
+	private static Exchange usedExchange = null;
+	
+	public static void setExchange(Exchange exchange){
+		ExchangeFuntions.usedExchange = exchange;
+	}
+	
 	public static CurrencyPair getUSDBasedCurrencyPairFor(String shortCoinName){
 		if(shortCoinName == null || shortCoinName.trim().equals("")){
 			//TODO log
@@ -61,10 +73,10 @@ public class ExchangeFuntions {
 	 * @return the OrderID of created order if it could be created OR <br>
 	 * <b>null</b> if there were any problem..
 	 */
-	public static String createSellOrderFor(Exchange krakenExchange, BigDecimal tradeableAmount, CurrencyPair currencyPair){
+	public static String createSellOrderFor(BigDecimal tradeableAmount, CurrencyPair currencyPair){
 
 		// Interested in the private trading functionality (authentication) 
-		TradeService tradeService = krakenExchange.getTradeService();
+		TradeService tradeService = usedExchange.getTradeService();
 		
 		// Create a marketOrder with specified parameters 
 		MarketOrder marketOrder = new MarketOrder(OrderType.ASK, tradeableAmount, currencyPair);
@@ -89,6 +101,7 @@ public class ExchangeFuntions {
 		
 		return orderID;
 	}
+	
 	
 	/**
 	 * Return the last price of specified currency pair OR <br>
@@ -125,6 +138,62 @@ public class ExchangeFuntions {
 		}
 		
 		return lastPrice;
+	}
+
+	
+	public static BigDecimal getAvailableBalanceFor(String currencyShortName){
+		if(currencyShortName == null || currencyShortName.trim().equals("")){
+			//TODO: handle this case
+			return null;
+		}
+		Balance balance = getBalanceFor(currencyShortName); 
+		if(balance == null){
+			//TODO: handle this case
+			return null;
+		}
+		return balance.getAvailable();
+	}
+	
+	
+	public static Balance getBalanceFor(String currencyShortName){
+		if(currencyShortName == null || currencyShortName.trim().equals("")){
+			//TODO: handle this case
+			return null;
+		}
+		
+		AccountInfo accountInfo;
+		
+		if(usedExchange == null){
+			//TODO: log
+			return null;
+		}
+		
+		try {
+			accountInfo = usedExchange.getAccountService().getAccountInfo();
+		} catch (IOException e) {
+			//TODO
+			e.printStackTrace();
+			return null;
+		}
+		Map<String, Wallet> wallets = accountInfo.getWallets();
+
+		Iterator it = wallets.entrySet().iterator();
+		while (it.hasNext()) {
+			Map.Entry pair = (Map.Entry) it.next();
+			// log("Wallet: " + pair.getKey() + " => " + pair.getValue());
+			Wallet wallet = (Wallet) pair.getValue();
+
+			Map<Currency, Balance> balances = wallet.getBalances();
+			Iterator it2 = balances.entrySet().iterator();
+			while (it2.hasNext()) {
+				Map.Entry pair2 = (Map.Entry) it2.next();
+				if(pair2.getKey().toString().trim().equalsIgnoreCase(currencyShortName.trim())){
+					return (Balance) pair2.getValue();
+				}
+			}
+		}
+		
+		return null;
 	}
 	
 	public Exchange getExchangeForUser(String apiKey, String privateKey, String userName) {
