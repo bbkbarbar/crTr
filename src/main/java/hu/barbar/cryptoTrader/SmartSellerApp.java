@@ -39,6 +39,7 @@ import hu.barbar.util.FileHandler;
 public class SmartSellerApp {
 
 	private static final String configSourceJSONPath = "c:/kr_config.json";
+	//private static final String configSourceJSONPath = "/home/pi/smartSeller/kr_config.json";
 	
 	final static Logger logger = LoggerFactory.getLogger(SmartSellerApp.class);
 	
@@ -76,7 +77,7 @@ public class SmartSellerApp {
 	
 	private BigDecimal stopPrice = null;
 	
-	private BigDecimal lastPrice = null;
+	//private BigDecimal lastPrice = null;
 	
 	private BigDecimal currentPrice = null;
 	
@@ -97,42 +98,40 @@ public class SmartSellerApp {
 
 		initExchange();
 
-		usedCurrencyPair = getUSDBasedCurrencyPairFor(currency);
+		usedCurrencyPair = ExchangeFuntions.getUSDBasedCurrencyPairFor(currency);
 		
 		// Get initialPrice from Kraken.
 		long before, after;
 		before = System.currentTimeMillis();
-		lastPrice = getPriceOf(usedCurrencyPair);
+		currentPrice = ExchangeFuntions.getPriceOf(marketDataService, usedCurrencyPair);
 		after = System.currentTimeMillis();
 		log("Elasped time for get current price: " + (after - before) + " ms\n");
-		if(lastPrice == null){
+		if(currentPrice == null){
 			System.exit(2);
 		}
 		
 		BigDecimal currentlyAvailableBalance = this.getAvailableBalanceFor(this.currency);
 		
-		sellMargin = lastPrice.subtract(stopPrice);
+		sellMargin = currentPrice.subtract(stopPrice);
 		
 		// Show parameters
-		log("Initial price:      \t" + lastPrice + " USD / " + this.currency);
+		log("Initial price:      \t" + currentPrice + " USD / " + this.currency);
 		log("Initial stop limit: \t" + stopPrice + " USD / " + this.currency);
 		log("Sell margin:        \t" + sellMargin + " USD");
 		log("Amount:             \t" + (lessThen(this.amount,0)?"All available":this.amount) + " " + this.currency);
 		log("Available balance:  \t" + currentlyAvailableBalance + " " + this.currency);
 		log("Minimum income:     \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.stopPrice)).setScale(2, BigDecimal.ROUND_HALF_UP) + " USD");
-		log("Current value:      \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.lastPrice)).setScale(2, BigDecimal.ROUND_HALF_UP) + " USD");
-		log("Maximum loss:       \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.lastPrice).subtract((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.stopPrice)) ).setScale(2, BigDecimal.ROUND_HALF_UP) + " USD");
+		log("Current value:      \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.currentPrice)).setScale(2, BigDecimal.ROUND_HALF_UP) + " USD");
+		log("Maximum loss:       \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.currentPrice).subtract((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.stopPrice)) ).setScale(2, BigDecimal.ROUND_HALF_UP) + " USD");
 		log("\n");
 		
 		// Check parameters and exit if invalid
-		if(stopPrice.compareTo(lastPrice) >= 0){
+		if(stopPrice.compareTo(currentPrice) >= 0){
 			//TODO log
 			log("ERROR! Inital stop price is NOT lower then initial price!");
 			//TODO: create an "instant sell" option for this case..
 			System.exit(3);
 		}
-		
-		currentPrice = lastPrice.add(BigDecimal.ZERO);
 		
 	}
 	
@@ -164,19 +163,19 @@ public class SmartSellerApp {
 	private void doTheJob(){
 		
 		// Store the previous price
-		lastPrice = currentPrice.add(BigDecimal.ZERO);
+		//lastPrice = currentPrice.add(BigDecimal.ZERO);
 		
 		while(true){
 			
 			// Update current price
-			currentPrice = getPriceOf(usedCurrencyPair);
+			currentPrice = ExchangeFuntions.getPriceOf(marketDataService, usedCurrencyPair);
 			
 			// Price increasing >> need to increase stopPrice
 			if(currentPrice.compareTo( (stopPrice.add(sellMargin)) ) > 0){
 				stopPrice = currentPrice.subtract(sellMargin);
 			}
 			// Store the previous price
-			lastPrice = currentPrice.add(BigDecimal.ZERO);
+			//lastPrice = currentPrice.add(BigDecimal.ZERO);
 			
 			showCurrentValues();
 			storeValues();
@@ -184,7 +183,7 @@ public class SmartSellerApp {
 			// Check if stopPrice is bigger then currentPrice >> need to sell..
 			if(stopPrice.compareTo(currentPrice) > 0){
 				log("\nPrice is lower then stop price!\nNeed to sell!!!");
-				String sellOrderId = createSellOrderFor(this.amount, this.usedCurrencyPair);
+				String sellOrderId = ExchangeFuntions.createSellOrderFor(krakenExchange, this.amount, this.usedCurrencyPair);
 				log("Sell order submitted: " + sellOrderId);
 				System.exit(0);
 			}
@@ -222,7 +221,7 @@ public class SmartSellerApp {
 		
 		line += "\tCurr: "   + currentPrice.setScale(3, BigDecimal.ROUND_HALF_UP);
 		line += "\tStop: "   + stopPrice.setScale(3, BigDecimal.ROUND_HALF_UP);
-		line += "\tMargin: " + sellMargin.setScale(3, BigDecimal.ROUND_HALF_UP);
+		//line += "\tMargin: " + sellMargin.setScale(3, BigDecimal.ROUND_HALF_UP);
 		line += "\tDiff: "   + diff.setScale(3, BigDecimal.ROUND_HALF_UP);
 		
 		log(line);
@@ -234,7 +233,7 @@ public class SmartSellerApp {
 			String line = sdf.format(new Date());
 			line += separatorInDataFile + currentPrice;
 			line += separatorInDataFile + stopPrice;
-			line += separatorInDataFile + sellMargin;
+			//line += separatorInDataFile + sellMargin;
 			line += separatorInDataFile + diff;
 			FileHandler.appendToFile(this.dataFile, line);
 		}
@@ -322,119 +321,6 @@ public class SmartSellerApp {
 		
 		
 		log("Amount: " + amount + " " + currency);
-	}
-	
-	
-	/**
-	 * Return the last price of specified currency pair OR <br>
-	 * <b>null</b> in case of exception caught.
-	 * @param currencyPair
-	 * @return
-	 */
-	private BigDecimal getPriceOf(CurrencyPair currencyPair){
-		
-		if(currencyPair == null){
-			//TODO log..
-			log("Can not get price of currencyPair without specified currencyPair (it was NULL).");
-			return null;
-		}
-		
-		BigDecimal lastPrice = null;
-		
-		// Get the latest ticker data showing price of specified currency pair.
-		Ticker ticker;
-		try {
-			
-			ticker = marketDataService.getTicker(currencyPair);
-			lastPrice = ticker.getLast();
-
-		} catch (NotAvailableFromExchangeException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ExchangeException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		return lastPrice;
-	}
-
-	
-	private static CurrencyPair getUSDBasedCurrencyPairFor(String shortCoinName){
-		if(shortCoinName == null || shortCoinName.trim().equals("")){
-			//TODO log
-			log("Can not create USD based CurrencyPair object for: |" + shortCoinName + "|.");
-			return null;
-		}
-		
-		if(shortCoinName.equalsIgnoreCase("XBT")){
-			return CurrencyPair.BTC_USD;
-		}
-		
-		if(shortCoinName.equalsIgnoreCase("BTC")){
-			return CurrencyPair.BTC_USD;
-		}
-		
-		if(shortCoinName.equalsIgnoreCase("ETH")){
-			return CurrencyPair.ETH_USD;
-		}
-		
-		if(shortCoinName.equalsIgnoreCase("BCH")){
-			return CurrencyPair.BCH_USD;
-		}
-		
-		if(shortCoinName.equalsIgnoreCase("XMR")){
-			return CurrencyPair.XMR_USD;
-		}
-		
-		if(shortCoinName.equalsIgnoreCase("XRP")){
-			return CurrencyPair.XRP_USD;
-		}
-		
-		//TODO log
-		log("ERROR: Can not get CurrencyPair object for |" + shortCoinName + "|.");
-		return null;
-	}
-	
-	/**
-	 * Create Selling order with specified parameters
-	 * @param tradeableAmount
-	 * @param currencyPair
-	 * @return the OrderID of created order if it could be created OR <br>
-	 * <b>null</b> if there were any problem..
-	 */
-	private String createSellOrderFor(BigDecimal tradeableAmount, CurrencyPair currencyPair){
-
-		// Interested in the private trading functionality (authentication) 
-		TradeService tradeService = krakenExchange.getTradeService();
-		
-		// Create a marketOrder with specified parameters 
-		MarketOrder marketOrder = new MarketOrder(OrderType.ASK, tradeableAmount, currencyPair);
-		
-		String orderID = null;
-		try {
-			
-			orderID = tradeService.placeMarketOrder(marketOrder);
-			log("Order created with ID: " + orderID);
-			
-		} catch (NotAvailableFromExchangeException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (NotYetImplementedForExchangeException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ExchangeException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		return orderID;
 	}
 	
 	
@@ -546,17 +432,6 @@ public class SmartSellerApp {
 			e.printStackTrace();
 		}
 		/**/
-	}
-
-	private Exchange getExchangeForUser(String apiKey, String privateKey, String userName) {
-
-		Exchange krakenExchange = ExchangeFactory.INSTANCE.createExchange(KrakenExchange.class.getName());
-		krakenExchange.getExchangeSpecification().setApiKey(apiKey);
-		krakenExchange.getExchangeSpecification().setSecretKey(privateKey);
-		krakenExchange.getExchangeSpecification().setUserName(userName);
-		krakenExchange.applySpecification(krakenExchange.getExchangeSpecification());
-		return krakenExchange;
-
 	}
 
 	private static void fundingHistory(AccountService accountService) throws IOException {
