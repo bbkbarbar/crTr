@@ -16,6 +16,8 @@ public abstract class SmartSeller implements Serializable {
 	 */
 	private static final long serialVersionUID = 4650305798661637668L;
 
+	private boolean debug_mode = true;
+	
 
 	private MarketDataService marketDataService = null;
 	
@@ -42,7 +44,9 @@ public abstract class SmartSeller implements Serializable {
 		
 		this.id = generateNextId();
 		
-		this.amount = amount;
+		this.amount = amount.add(BigDecimal.ZERO);
+		
+		this.stopPrice = initialStopPrice.add(BigDecimal.ZERO);
 		
 		this.currency = currencyNameShort;
 		
@@ -111,11 +115,18 @@ public abstract class SmartSeller implements Serializable {
 		BigDecimal diff = currentPrice.subtract(stopPrice);
 		this.storeValues(new Date(), currentPrice, this.stopPrice, diff);
 		
+		this.showValues(new Date(), currentPrice, this.stopPrice, diff);
+		
 		// Check if stopPrice is bigger then currentPrice >> need to sell..
 		if(stopPrice.compareTo(currentPrice) > 0){
 			log(this.id, "\nPrice is lower then stop price!\nNeed to sell!!!");
 			
-			String sellOrderId = ExchangeFuntions.createSellOrderFor(this.amount, this.usedCurrencyPair);
+			String sellOrderId = null;
+			if(!debug_mode){
+				sellOrderId = ExchangeFuntions.createSellOrderFor(this.amount, this.usedCurrencyPair);
+			}else{
+				sellOrderId = "Debug mode enabled, selling is mocked.";
+			}
 			log(this.id, "Sell order submitted: " + sellOrderId);
 			this.done = true;
 			this.onSellOrderSubmitted(sellOrderId);
@@ -139,6 +150,8 @@ public abstract class SmartSeller implements Serializable {
 	
 	public abstract void storeValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff);
 
+	public abstract void showValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff);
+	
 	private static long generateNextId(){
 		long nextId = SmartSeller.nextId;
 		SmartSeller.nextId++;

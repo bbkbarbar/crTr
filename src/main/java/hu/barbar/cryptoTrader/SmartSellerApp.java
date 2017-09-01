@@ -119,6 +119,11 @@ public class SmartSellerApp {
 			public void onSellOrderSubmitted(String sellOrderId) {
 				System.exit(0);
 			}
+
+			@Override
+			public void showValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff) {
+				SmartSellerApp.log(sdf.format(date) + "\tCurrent: " + currentPrice + "\tStopLimit: " + stopPrice2 + "\tDiff: " + diff);
+			}
 			
 		};
 		
