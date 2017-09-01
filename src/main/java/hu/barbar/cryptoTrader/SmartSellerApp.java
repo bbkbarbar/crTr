@@ -196,6 +196,8 @@ public class SmartSellerApp {
 		
 		while(true){
 			
+			mySeller.checkSellingConditions();
+			
 			/*
 			// Update current price
 			currentPrice = ExchangeFuntions.getPriceOf(marketDataService, usedCurrencyPair);
