@@ -1,13 +1,20 @@
 package hu.barbar.cryptoTrader;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.net.SocketTimeoutException;
 import java.util.Date;
 
 import org.knowm.xchange.currency.CurrencyPair;
+import org.knowm.xchange.exceptions.ExchangeException;
+import org.knowm.xchange.exceptions.NotAvailableFromExchangeException;
+import org.knowm.xchange.exceptions.NotYetImplementedForExchangeException;
 import org.knowm.xchange.service.marketdata.MarketDataService;
 
-import hu.barbar.util.FileHandler;
+import hu.barbar.retryHandler.RetryHandler;
+import hu.barbar.retryHandler.RetryHandler.ResultAfterMultipleRetries;
+import hu.barbar.retryHandler.util.RetryParams;
 
 public abstract class SmartSeller implements Serializable {
 
@@ -31,7 +38,7 @@ public abstract class SmartSeller implements Serializable {
 	
 	private BigDecimal amount = null;
 	
-	private String currency = null;
+	private String currencyStr = null;
 	
 	private CurrencyPair usedCurrencyPair = null;
 	
@@ -39,11 +46,16 @@ public abstract class SmartSeller implements Serializable {
 	
 	private boolean done = false;
 	
+	private RetryParams retryParams = null;
+	
+	
 	public abstract class SellingThread extends Thread {
 		
 		private BigDecimal amount = null;
 		
 		private CurrencyPair currencyPair = null;
+		
+		RetryParams retryParams = null;
 		
 		/**
 		 * This method will be called when selling order has been submitted
@@ -51,20 +63,48 @@ public abstract class SmartSeller implements Serializable {
 		 * @param orderId contains the id of submitted order
 		 * <br> or null if order could not be submitted.
 		 */
-		abstract void onSellingDone(String orderId);
+		abstract void onSellingDone(ResultAfterMultipleRetries ram);
 		
-		public SellingThread(BigDecimal amount, CurrencyPair cp){
+		public SellingThread(BigDecimal amount, CurrencyPair cp, RetryParams retryParams){
 			this.amount = amount.add(BigDecimal.ZERO);
 			this.currencyPair = cp;
+			this.retryParams = retryParams;
 		}
 		
 		@Override
 		public void run() {
 			
 			// Create selling order
-			String sellOrderId = ExchangeFuntions.createSellOrderFor(this.amount, this.currencyPair);
+			//String sellOrderId = ExchangeFuntions.createSellOrderFor(this.amount, this.currencyPair);
 			
-			this.onSellingDone(sellOrderId);
+			String sellOrderId = null;
+			ResultAfterMultipleRetries ram = new RetryHandler(this.retryParams){
+
+				@Override
+				public Object doProblematicJob() throws SocketTimeoutException, NotAvailableFromExchangeException,
+						ExchangeException, NotYetImplementedForExchangeException, IOException, Exception {
+					
+					return ExchangeFuntions.createSellOrderFor(SellingThread.this.amount, SellingThread.this.currencyPair);
+					
+				}
+				
+				@Override
+				public void onTryFails(int currentRetryCount, Exception e) {
+					
+				}
+				
+			}.run();
+			
+			if(ram.isDoneSuccessfully()){
+				// Changed to give ResultAfterMultipleRetries object as parameter of onSellingDone method.
+				//sellOrderId = ram.getResultString();
+			}else{
+				System.out.println(ram.getStackTraces());
+				sellOrderId = null;
+				//TODO: log exceptions from ram object..
+			}
+			
+			this.onSellingDone(ram);
 			
 			super.run();
 		}
@@ -72,7 +112,7 @@ public abstract class SmartSeller implements Serializable {
 	}
 	
 	
-	public SmartSeller(BigDecimal amount, String currencyNameShort, BigDecimal initialStopPrice, MarketDataService marketDataService){
+	public SmartSeller(BigDecimal amount, String currencyNameShort, BigDecimal initialStopPrice, MarketDataService marketDataService, RetryParams retryParams){
 		
 		this.id = generateNextId();
 		
@@ -80,9 +120,11 @@ public abstract class SmartSeller implements Serializable {
 		
 		this.stopPrice = initialStopPrice.add(BigDecimal.ZERO);
 		
-		this.currency = currencyNameShort;
+		this.currencyStr = currencyNameShort;
 		
 		this.marketDataService = marketDataService;
+		
+		this.retryParams = retryParams;
 		
 		usedCurrencyPair = ExchangeFuntions.getUSDBasedCurrencyPairFor(currencyNameShort);
 		
@@ -101,17 +143,17 @@ public abstract class SmartSeller implements Serializable {
 		}
 		
 		
-		BigDecimal currentlyAvailableBalance = ExchangeFuntions.getAvailableBalanceFor(this.currency);
+		BigDecimal currentlyAvailableBalance = ExchangeFuntions.getAvailableBalanceFor(this.currencyStr);
 		//TODO drop warning if available balance is lower then amount
 		
 		sellMargin = currentPrice.subtract(stopPrice);
 		
 		// Show parameters
-		log(this.id, "Initial price:      \t" + currentPrice + " USD / " + this.currency);
-		log(this.id, "Initial stop limit: \t" + stopPrice + " USD / " + this.currency);
+		log(this.id, "Initial price:      \t" + currentPrice + " USD / " + this.currencyStr);
+		log(this.id, "Initial stop limit: \t" + stopPrice + " USD / " + this.currencyStr);
 		log(this.id, "Sell margin:        \t" + sellMargin + " USD");
-		log(this.id, "Amount:             \t" + (lessThen(this.amount,0)?"All available":this.amount) + " " + this.currency);
-		log(this.id, "Available balance:  \t" + currentlyAvailableBalance + " " + this.currency);
+		log(this.id, "Amount:             \t" + (lessThen(this.amount,0)?"All available":this.amount) + " " + this.currencyStr);
+		log(this.id, "Available balance:  \t" + currentlyAvailableBalance + " " + this.currencyStr);
 		log(this.id, "Minimum income:     \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.stopPrice)).setScale(2, BigDecimal.ROUND_HALF_UP) + " USD");
 		log(this.id, "Current value:      \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(currentPrice)).setScale(2, BigDecimal.ROUND_HALF_UP) + " USD");
 		log(this.id, "Maximum loss:       \t" + ((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(currentPrice).subtract((lessThen(this.amount,0)?currentlyAvailableBalance:this.amount).multiply(this.stopPrice)) ).setScale(2, BigDecimal.ROUND_HALF_UP) + " USD");
@@ -145,7 +187,7 @@ public abstract class SmartSeller implements Serializable {
 		
 		
 		BigDecimal diff = currentPrice.subtract(stopPrice);
-		this.storeValues(new Date(), currentPrice, this.stopPrice, diff);
+		this.storeValues(new Date(), this.getId(), this.currencyStr, currentPrice, this.stopPrice, diff);
 		
 		this.showValues(new Date(), currentPrice, this.stopPrice, diff);
 		
@@ -155,21 +197,51 @@ public abstract class SmartSeller implements Serializable {
 			
 			String sellOrderId = null;
 			if(!debug_mode){
-				sellOrderId = ExchangeFuntions.createSellOrderFor(this.amount, this.usedCurrencyPair);
+				
+				// Create selling order
+				// function has been moved to a separated thread
+				
+				SellingThread st = new SellingThread(this.amount, this.usedCurrencyPair, this.retryParams) {
+					@Override
+					void onSellingDone(ResultAfterMultipleRetries ram) {
+						
+						if(ram.isDoneSuccessfully()){
+							String orderId = ram.getResultString();
+							log(SmartSeller.this.id, "Sell order submitted: " + orderId);
+							SmartSeller.this.onSellOrderSubmitted(orderId);
+						}else{
+							SmartSeller.this.onSellOrderSubmitFailed();
+						}
+						
+					}
+				};
+				st.start();
+				
+				/**/
+				
+				//sellOrderId = ExchangeFuntions.createSellOrderFor(this.amount, this.usedCurrencyPair);
 			}else{
 				sellOrderId = "Debug mode enabled, selling is mocked.";
 			}
-			log(this.id, "Sell order submitted: " + sellOrderId);
 			this.done = true;
+			log(this.id, "Sell order submitted: " + sellOrderId);
 			this.onSellOrderSubmitted(sellOrderId);
 		}
 		
 	}
 	
 	
-	public abstract void onSellOrderSubmitted(String sellOrderId);
-	
+	public abstract void onSellOrderSubmitFailed();
 
+	public abstract void onSellOrderSubmitted(String sellOrderId);
+
+	public abstract void log(long smartSellerId, String line);
+	
+	public abstract void storeValues(Date date, long smartSellerId, String currencyStr, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff);
+
+	public abstract void showValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff);
+	
+	
 	/**
 	 * Get unique Id of SmartSeller object
 	 * @return unique Id of SmartSeller object
@@ -178,26 +250,19 @@ public abstract class SmartSeller implements Serializable {
 		return this.id;
 	}
 	
-	public abstract void log(long smartSellerId, String line);
-	
-	public abstract void storeValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff);
-
-	public abstract void showValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff);
-	
 	private static long generateNextId(){
 		long nextId = SmartSeller.nextId;
 		SmartSeller.nextId++;
 		return nextId;
 	}
 	
-	
 	private boolean lessThen(BigDecimal value, int compareValue){
 		return value.compareTo(new BigDecimal(compareValue)) < 0;
 	}
 	
-	
 	public boolean isInitialized(){
 		return this.initialized;
 	}
+	
 	
 }

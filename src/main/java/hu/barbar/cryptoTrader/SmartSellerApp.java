@@ -4,28 +4,15 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Iterator;
-import java.util.Map;
 
-import org.codehaus.plexus.configuration.processor.ConfigurationResourceHandler;
 import org.knowm.xchange.Exchange;
 import org.knowm.xchange.ExchangeFactory;
 import org.knowm.xchange.currency.Currency;
 import org.knowm.xchange.currency.CurrencyPair;
-import org.knowm.xchange.dto.Order.OrderType;
-import org.knowm.xchange.dto.account.AccountInfo;
-import org.knowm.xchange.dto.account.Balance;
 import org.knowm.xchange.dto.account.FundingRecord;
-import org.knowm.xchange.dto.account.Wallet;
-import org.knowm.xchange.dto.marketdata.Ticker;
-import org.knowm.xchange.dto.trade.MarketOrder;
-import org.knowm.xchange.exceptions.ExchangeException;
-import org.knowm.xchange.exceptions.NotAvailableFromExchangeException;
-import org.knowm.xchange.exceptions.NotYetImplementedForExchangeException;
 import org.knowm.xchange.kraken.KrakenExchange;
 import org.knowm.xchange.service.account.AccountService;
 import org.knowm.xchange.service.marketdata.MarketDataService;
-import org.knowm.xchange.service.trade.TradeService;
 import org.knowm.xchange.service.trade.params.HistoryParamsFundingType;
 import org.knowm.xchange.service.trade.params.TradeHistoryParamCurrencies;
 import org.knowm.xchange.service.trade.params.TradeHistoryParams;
@@ -34,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import hu.barbar.confighandler.JsonConfigHandler;
+import hu.barbar.retryHandler.util.RetryParams;
 import hu.barbar.util.FileHandler;
 
 public class SmartSellerApp {
@@ -100,19 +88,24 @@ public class SmartSellerApp {
 		sdf = new SimpleDateFormat(config.getString("dateformat", DEFAULT_TIMESTAMP_FORMAT));
 
 		initExchange();
-
-		mySeller = new SmartSeller(this.amount, this.currency, this.stopPrice, SmartSellerApp.marketDataService) {
+		
+		RetryParams retryParamsForSellingOrderCreation = new RetryParams(
+			config.getLong("retry.max count", (long) 10), 
+			config.getLong("retry.delay in ms", (long) 1000)
+		);
+		
+		mySeller = new SmartSeller(this.amount, this.currency, this.stopPrice, SmartSellerApp.marketDataService, retryParamsForSellingOrderCreation) {
 			
 			private static final long serialVersionUID = 3911932357314851974L;
 			
 			@Override
 			public void log(long smartSellerId, String line) {
-				SmartSellerApp.log(line);
+				SmartSellerApp.log("Sid: " + smartSellerId + " " + line);
 			}
 
 			@Override
-			public void storeValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff) {
-				SmartSellerApp.this.storeValues(date, currentPrice, stopPrice2, diff);
+			public void storeValues(Date date, long smartSellerId, String currencyStr, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff) {
+				SmartSellerApp.this.storeValues(date, smartSellerId, currencyStr, currentPrice, stopPrice2, diff);
 			}
 
 			@Override
@@ -124,8 +117,15 @@ public class SmartSellerApp {
 			public void showValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff) {
 				SmartSellerApp.log(sdf.format(date) + "\tCurrent: " + currentPrice + "\tStopLimit: " + stopPrice2 + "\tDiff: " + diff);
 			}
+
+			@Override
+			public void onSellOrderSubmitFailed() {
+				// TODO Auto-generated method stub
+				
+			}
 			
 		};
+		/**/
 		
 		/*
 		usedCurrencyPair = ExchangeFuntions.getUSDBasedCurrencyPairFor(currency);
@@ -266,9 +266,11 @@ public class SmartSellerApp {
 		log(line);
 	}
 	
-	private void storeValues(Date date, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff){
+	private void storeValues(Date date, long smartSellerId, String currencyStr, BigDecimal currentPrice, BigDecimal stopPrice2, BigDecimal diff){
 		if(this.dataFile != null){
 			String line = sdf.format(date);
+			line += separatorInDataFile + smartSellerId;
+			line += separatorInDataFile + currencyStr;
 			line += separatorInDataFile + currentPrice;
 			line += separatorInDataFile + stopPrice2;
 			//line += separatorInDataFile + sellMargin;

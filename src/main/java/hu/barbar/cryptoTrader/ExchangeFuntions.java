@@ -2,6 +2,7 @@ package hu.barbar.cryptoTrader;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.SocketTimeoutException;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -61,7 +62,6 @@ public class ExchangeFuntions {
 			return CurrencyPair.XRP_USD;
 		}
 		
-		
 		//TODO log
 		//log("ERROR: Can not get CurrencyPair object for |" + shortCoinName + "|.");
 		return null;
@@ -74,7 +74,12 @@ public class ExchangeFuntions {
 	 * @return the OrderID of created order if it could be created OR <br>
 	 * <b>null</b> if there were any problem..
 	 */
-	public static String createSellOrderFor(BigDecimal tradeableAmount, CurrencyPair currencyPair){
+	public static String createSellOrderFor(BigDecimal tradeableAmount, CurrencyPair currencyPair) 
+			throws SocketTimeoutException, 
+				   NotAvailableFromExchangeException, 
+				   ExchangeException,
+				   NotYetImplementedForExchangeException,
+				   IOException {
 
 		// Interested in the private trading functionality (authentication) 
 		TradeService tradeService = usedExchange.getTradeService();
@@ -82,23 +87,10 @@ public class ExchangeFuntions {
 		// Create a marketOrder with specified parameters 
 		MarketOrder marketOrder = new MarketOrder(OrderType.ASK, tradeableAmount, currencyPair);
 		
-		String orderID = null;
-		try {
+		String orderID = tradeService.placeMarketOrder(marketOrder);
+		//TODO: log
+		//log("Order created with ID: " + orderID);
 			
-			orderID = tradeService.placeMarketOrder(marketOrder);
-			//TODO: log
-			//log("Order created with ID: " + orderID);
-			
-		} catch (NotAvailableFromExchangeException e) {
-			//TODO: handle exception cases 
-			e.printStackTrace();
-		} catch (NotYetImplementedForExchangeException e) {
-			e.printStackTrace();
-		} catch (ExchangeException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
 		
 		return orderID;
 	}
