@@ -39,6 +39,38 @@ public abstract class SmartSeller implements Serializable {
 	
 	private boolean done = false;
 	
+	public abstract class SellingThread extends Thread {
+		
+		private BigDecimal amount = null;
+		
+		private CurrencyPair currencyPair = null;
+		
+		/**
+		 * This method will be called when selling order has been submitted
+		 * <or> when the creating selling order has failed
+		 * @param orderId contains the id of submitted order
+		 * <br> or null if order could not be submitted.
+		 */
+		abstract void onSellingDone(String orderId);
+		
+		public SellingThread(BigDecimal amount, CurrencyPair cp){
+			this.amount = amount.add(BigDecimal.ZERO);
+			this.currencyPair = cp;
+		}
+		
+		@Override
+		public void run() {
+			
+			// Create selling order
+			String sellOrderId = ExchangeFuntions.createSellOrderFor(this.amount, this.currencyPair);
+			
+			this.onSellingDone(sellOrderId);
+			
+			super.run();
+		}
+		
+	}
+	
 	
 	public SmartSeller(BigDecimal amount, String currencyNameShort, BigDecimal initialStopPrice, MarketDataService marketDataService){
 		

@@ -61,6 +61,7 @@ public class ExchangeFuntions {
 			return CurrencyPair.XRP_USD;
 		}
 		
+		
 		//TODO log
 		//log("ERROR: Can not get CurrencyPair object for |" + shortCoinName + "|.");
 		return null;
