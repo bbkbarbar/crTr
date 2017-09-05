@@ -58,6 +58,10 @@ public class ExchangeFuntions {
 			return CurrencyPair.XMR_USD;
 		}
 		
+		if(shortCoinName.equalsIgnoreCase("LTC")){
+			return CurrencyPair.LTC_USD;
+		}
+		
 		if(shortCoinName.equalsIgnoreCase("XRP")){
 			return CurrencyPair.XRP_USD;
 		}
