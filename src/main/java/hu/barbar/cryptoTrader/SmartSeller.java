@@ -23,7 +23,7 @@ public abstract class SmartSeller implements Serializable {
 	 */
 	private static final long serialVersionUID = 4650305798661637668L;
 
-	private boolean debug_mode = true;
+	private boolean debug_mode = false;
 	
 
 	private MarketDataService marketDataService = null;
