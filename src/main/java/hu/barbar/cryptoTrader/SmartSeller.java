@@ -34,6 +34,10 @@ public abstract class SmartSeller implements Serializable {
 	
 	private BigDecimal stopPrice = null;
 	
+	private BigDecimal initialPrice = null;
+	
+	private BigDecimal tooHighToBeReal = null;
+	
 	private BigDecimal sellMargin = null;
 	
 	private BigDecimal amount = null;
@@ -135,12 +139,16 @@ public abstract class SmartSeller implements Serializable {
 		before = System.currentTimeMillis();
 		currentPrice = ExchangeFuntions.getPriceOf(marketDataService, usedCurrencyPair);
 		after = System.currentTimeMillis();
+		this.initialPrice = currentPrice.add(BigDecimal.ZERO);
 		//TODO: log, sysout
 		log(this.id, "Elasped time for get current price: " + (after - before) + " ms\n");
 		if(currentPrice == null){
 			this.initialized = false;
 			return;
 		}
+		
+		BigDecimal tooHighMultiplicand = new BigDecimal(20);
+		this.tooHighToBeReal = this.initialPrice.multiply(tooHighMultiplicand);
 		
 		
 		BigDecimal currentlyAvailableBalance = ExchangeFuntions.getAvailableBalanceFor(this.currencyStr);
@@ -181,7 +189,8 @@ public abstract class SmartSeller implements Serializable {
 		BigDecimal currentPrice = ExchangeFuntions.getPriceOf(marketDataService, usedCurrencyPair);
 		
 		// Price increasing >> need to increase stopPrice
-		if(currentPrice.compareTo( (this.stopPrice.add(this.sellMargin)) ) > 0){
+		if((currentPrice.compareTo( (this.stopPrice.add(this.sellMargin)) ) > 0)
+			&& (currentPrice.compareTo(tooHighToBeReal) < 0) ){
 			this.stopPrice = currentPrice.subtract(this.sellMargin);
 		}
 		
