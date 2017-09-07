@@ -109,7 +109,10 @@ public class SmartSellerApp {
 			}
 
 			@Override
-			public void onSellOrderSubmitted(String sellOrderId) {
+			public void onSellOrderSubmitted(String sellOrderId) 
+			{
+				done = true;
+				log(id, "Sell order submitted: " + sellOrderId);
 				System.exit(0);
 			}
 

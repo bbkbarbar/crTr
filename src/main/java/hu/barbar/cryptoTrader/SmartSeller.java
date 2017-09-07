@@ -30,7 +30,7 @@ public abstract class SmartSeller implements Serializable {
 	
 	private static long nextId = 0; 
 	
-	private long id = -1;
+	protected long id = -1;
 	
 	private BigDecimal stopPrice = null;
 	
@@ -48,7 +48,7 @@ public abstract class SmartSeller implements Serializable {
 	
 	private boolean initialized = false;
 	
-	private boolean done = false;
+	protected boolean done = false;
 	
 	private RetryParams retryParams = null;
 	
@@ -216,7 +216,7 @@ public abstract class SmartSeller implements Serializable {
 						
 						if(ram.isDoneSuccessfully()){
 							String orderId = ram.getResultString();
-							log(SmartSeller.this.id, "Sell order submitted: " + orderId);
+							//log(SmartSeller.this.id, "Sell order submitted: " + orderId);
 							SmartSeller.this.onSellOrderSubmitted(orderId);
 						}else{
 							SmartSeller.this.onSellOrderSubmitFailed();
@@ -231,10 +231,9 @@ public abstract class SmartSeller implements Serializable {
 				//sellOrderId = ExchangeFuntions.createSellOrderFor(this.amount, this.usedCurrencyPair);
 			}else{
 				sellOrderId = "Debug mode enabled, selling is mocked.";
+				log(this.id, "Sell order submitted: " + sellOrderId);
 			}
-			this.done = true;
-			log(this.id, "Sell order submitted: " + sellOrderId);
-			this.onSellOrderSubmitted(sellOrderId);
+			
 		}
 		
 	}
