@@ -90,9 +90,10 @@ public class SmartSellerApp {
 		initExchange();
 		
 		RetryParams retryParamsForSellingOrderCreation = new RetryParams(
-			config.getLong("retry.max count", (long) 10), 
-			config.getLong("retry.delay in ms", (long) 1000)
+			config.getLong("retry.max count", (long) 12), 
+			config.getLong("retry.delay in ms", (long) 5000)
 		);
+		System.out.println("Retry params: " + retryParamsForSellingOrderCreation.toString() );
 		
 		mySeller = new SmartSeller(this.amount, this.currency, this.stopPrice, SmartSellerApp.marketDataService, retryParamsForSellingOrderCreation) {
 			
@@ -109,8 +110,7 @@ public class SmartSellerApp {
 			}
 
 			@Override
-			public void onSellOrderSubmitted(String sellOrderId) 
-			{
+			public void onSellOrderSubmitted(String sellOrderId) {
 				done = true;
 				log(id, "Sell order submitted: " + sellOrderId);
 				System.exit(0);

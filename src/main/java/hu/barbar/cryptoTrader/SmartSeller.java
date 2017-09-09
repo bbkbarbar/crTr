@@ -94,7 +94,7 @@ public abstract class SmartSeller implements Serializable {
 				
 				@Override
 				public void onTryFails(int currentRetryCount, Exception e) {
-					
+					SmartSeller.this.log(SmartSeller.this.getId(), "Try [" + currentRetryCount + "] failed..");
 				}
 				
 			}.run();
