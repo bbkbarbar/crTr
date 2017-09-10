@@ -14,5 +14,15 @@
    		"dateformat":"yyyy-MM-dd HH:mm:ss",
    		"separator":";"
    },
+   "retry":{
+   	"check price":{
+   		"max count":5,
+   		"delay in ms":1000
+   	},
+   	"selling":{
+   		"max count":12,
+   		"delay in ms":5000
+   	}
+   },
    "logfile":"SmartSeller.log"
 }

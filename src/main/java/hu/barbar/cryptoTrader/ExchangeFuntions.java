@@ -1,6 +1,7 @@
 package hu.barbar.cryptoTrader;
 
 import java.io.IOException;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.math.BigDecimal;
 import java.net.SocketTimeoutException;
 import java.util.Iterator;
@@ -131,6 +132,10 @@ public class ExchangeFuntions {
 			e.printStackTrace();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (UndeclaredThrowableException udte) {
+			udte.printStackTrace();
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		

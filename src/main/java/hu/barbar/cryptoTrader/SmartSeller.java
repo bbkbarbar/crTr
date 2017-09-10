@@ -50,7 +50,12 @@ public abstract class SmartSeller implements Serializable {
 	
 	protected boolean done = false;
 	
-	private RetryParams retryParams = null;
+	protected boolean sellingInProgess = false;
+	
+	private RetryParams retryParamsForSelling = null;
+	
+	private RetryParams retryParamsForCheckPrice = null;
+	
 	
 	
 	public abstract class SellingThread extends Thread {
@@ -116,7 +121,7 @@ public abstract class SmartSeller implements Serializable {
 	}
 	
 	
-	public SmartSeller(BigDecimal amount, String currencyNameShort, BigDecimal initialStopPrice, MarketDataService marketDataService, RetryParams retryParams){
+	public SmartSeller(BigDecimal amount, String currencyNameShort, BigDecimal initialStopPrice, MarketDataService marketDataService, RetryParams retryParamsForSelling, RetryParams retryParamsForCheckPrice){
 		
 		this.id = generateNextId();
 		
@@ -128,7 +133,10 @@ public abstract class SmartSeller implements Serializable {
 		
 		this.marketDataService = marketDataService;
 		
-		this.retryParams = retryParams;
+		this.retryParamsForSelling = retryParamsForSelling;
+		this.retryParamsForCheckPrice = retryParamsForCheckPrice;
+		
+		this.sellingInProgess = false;
 		
 		usedCurrencyPair = ExchangeFuntions.getUSDBasedCurrencyPairFor(currencyNameShort);
 		
@@ -185,24 +193,53 @@ public abstract class SmartSeller implements Serializable {
 	 */
 	public void checkSellingConditions(){
 		
-		// Update current price
-		BigDecimal currentPrice = ExchangeFuntions.getPriceOf(marketDataService, usedCurrencyPair);
+		/*
+		 *  Update current price
+		 */
+		ResultAfterMultipleRetries getCurrentPriceRam =  new RetryHandler(retryParamsForCheckPrice){
+
+			@Override
+			public Object doProblematicJob() throws Exception {
+				BigDecimal currentPrice = ExchangeFuntions.getPriceOf(marketDataService, usedCurrencyPair);
+				return currentPrice;
+			}
+			
+		}.run();
+		BigDecimal currentPrice = (BigDecimal) getCurrentPriceRam.getResultObject();
+		//BigDecimal currentPrice = ExchangeFuntions.getPriceOf(marketDataService, usedCurrencyPair);
 		
-		// Price increasing >> need to increase stopPrice
+		
+		
+		/* 
+		 * If could not get current price because of any reason..
+		 */
+		if(currentPrice == null) {
+			return;
+		}
+		
+		/*
+		 *  Price increasing >> need to increase stopPrice
+		 */
 		if((currentPrice.compareTo( (this.stopPrice.add(this.sellMargin)) ) > 0)
 			&& (currentPrice.compareTo(tooHighToBeReal) < 0) ){
 			this.stopPrice = currentPrice.subtract(this.sellMargin);
 		}
 		
-		
+		/*
+		 * Store and show values
+		 */
 		BigDecimal diff = currentPrice.subtract(stopPrice);
 		this.storeValues(new Date(), this.getId(), this.currencyStr, currentPrice, this.stopPrice, diff);
-		
 		this.showValues(new Date(), currentPrice, this.stopPrice, diff);
 		
-		// Check if stopPrice is bigger then currentPrice >> need to sell..
-		if(stopPrice.compareTo(currentPrice) > 0){
+		
+		/*
+		 *  Check if stopPrice is bigger then currentPrice >> need to sell..
+		 */
+		if( (stopPrice.compareTo(currentPrice) > 0) && (!this.sellingInProgess)){
 			log(this.id, "\nPrice is lower then stop price!\nNeed to sell!!!");
+			
+			this.sellingInProgess = true;
 			
 			String sellOrderId = null;
 			if(!debug_mode){
@@ -210,7 +247,7 @@ public abstract class SmartSeller implements Serializable {
 				// Create selling order
 				// function has been moved to a separated thread
 				
-				SellingThread st = new SellingThread(this.amount, this.usedCurrencyPair, this.retryParams) {
+				SellingThread st = new SellingThread(this.amount, this.usedCurrencyPair, this.retryParamsForSelling) {
 					@Override
 					void onSellingDone(ResultAfterMultipleRetries ram) {
 						

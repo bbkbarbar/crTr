@@ -89,13 +89,26 @@ public class SmartSellerApp {
 
 		initExchange();
 		
-		RetryParams retryParamsForSellingOrderCreation = new RetryParams(
-			config.getLong("retry.max count", (long) 12), 
-			config.getLong("retry.delay in ms", (long) 5000)
+		/*
+		 * Get retry params for SmartSeller object
+		 */
+		RetryParams retryParamsForCheckPrice = new RetryParams(
+				config.getLong("retry.check price.max count", (long) 6), 
+				config.getLong("retry.check price.delay in ms", (long) 1000)
 		);
-		System.out.println("Retry params: " + retryParamsForSellingOrderCreation.toString() );
+		System.out.println("Retry params for check price: " + retryParamsForCheckPrice.toString() );
 		
-		mySeller = new SmartSeller(this.amount, this.currency, this.stopPrice, SmartSellerApp.marketDataService, retryParamsForSellingOrderCreation) {
+		RetryParams retryParamsForSellingOrderCreation = new RetryParams(
+			config.getLong("retry.selling.max count", (long) 12), 
+			config.getLong("retry.selling.delay in ms", (long) 5000)
+		);
+		System.out.println("Retry params for selling: " + retryParamsForSellingOrderCreation.toString() );
+		
+		
+		/*
+		 * Create SmartSeller object
+		 */
+		mySeller = new SmartSeller(this.amount, this.currency, this.stopPrice, SmartSellerApp.marketDataService, retryParamsForSellingOrderCreation, retryParamsForCheckPrice) {
 			
 			private static final long serialVersionUID = 3911932357314851974L;
 			
