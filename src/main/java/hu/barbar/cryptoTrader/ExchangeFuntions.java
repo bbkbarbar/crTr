@@ -134,9 +134,9 @@ public class ExchangeFuntions {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (UndeclaredThrowableException udte) {
-			udte.printStackTrace();
+			//udte.printStackTrace();
 		} catch (Exception e) {
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		
 		return lastPrice;

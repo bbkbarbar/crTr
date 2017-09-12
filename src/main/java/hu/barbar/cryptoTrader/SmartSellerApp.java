@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import hu.barbar.confighandler.JsonConfigHandler;
 import hu.barbar.retryHandler.util.RetryParams;
 import hu.barbar.util.FileHandler;
+import hu.barbar.util.logger.Log;
 
 public class SmartSellerApp {
 
@@ -42,6 +43,8 @@ public class SmartSellerApp {
 	private static final String DEFAULT_TIMESTAMP_FORMAT_IN_FILENAME = "yyyy-MM-dd_HH-mm-ss";
 
 	private static final int EXPECTED_ARGUMENT_COUNT = 3;
+	
+	static hu.barbar.util.logger.Log errorLog = null;
 
 	private JsonConfigHandler config = null;
 	
@@ -86,7 +89,11 @@ public class SmartSellerApp {
 		readConfig();
 		processParams(args);
 		sdf = new SimpleDateFormat(config.getString("dateformat", DEFAULT_TIMESTAMP_FORMAT));
-
+		
+		errorLog = new Log();
+		errorLog.init("", "SmartSeller_" + currency + "_error", Log.Level.INFO, Log.Level.WARN);
+		
+		
 		initExchange();
 		
 		/*
