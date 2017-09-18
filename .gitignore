@@ -1,3 +1,4 @@
 /target/
 /target/*
 SmartSeller.log
+/Releases/smartSeller_data_*.csv
