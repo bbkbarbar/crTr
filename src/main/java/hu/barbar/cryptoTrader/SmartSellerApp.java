@@ -27,8 +27,10 @@ import hu.barbar.util.logger.Log;
 
 public class SmartSellerApp {
 
-	private static final String configSourceJSONPath = "c:/kr_config.json";
-	//private static final String configSourceJSONPath = "/home/pi/smartSeller/kr_config.json";
+	private static final String CONFIG_SOURCE_JSON_ON_PC = "c:/kr_config.json";
+	private static final String CONFIG_SOURCE_JSON_ON_LINUX = "/home/pi/smartSeller/kr_config.json";
+	
+	private static String configSourceJSONPath = null;
 	
 	final static Logger logger = LoggerFactory.getLogger(SmartSellerApp.class);
 	
@@ -193,6 +195,13 @@ public class SmartSellerApp {
 	}
 	
 	private void readConfig(){
+		
+		if(FileHandler.runningOnLinux()){
+			configSourceJSONPath = CONFIG_SOURCE_JSON_ON_LINUX;
+		}else{
+			configSourceJSONPath = CONFIG_SOURCE_JSON_ON_PC;
+		}
+		
 		config = new JsonConfigHandler(configSourceJSONPath);
 		
 		logFile = config.getString("logfile", null);
